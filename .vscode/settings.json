@@ -47,6 +47,8 @@
         "tuple": "cpp",
         "typeindex": "cpp",
         "typeinfo": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "codecvt": "cpp",
+        "filesystem": "cpp"
     }
 }
