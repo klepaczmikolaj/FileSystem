@@ -36,6 +36,7 @@ class FileSystem{
             int totalBlocks;
             int usedBlocks;
             int fatSize;
+            int numberOfFiles;
         }systemInfo;
         
         struct FileNode{
@@ -44,7 +45,7 @@ class FileSystem{
             int blocksNumber;
             int sizeInBytes;
         };
-        std::vector<FileNode> inodes;
+        std::deque<FileNode> inodes;
         typedef char blockBuffer[BLOCK_SIZE];
         std::fstream fileFS;
 

@@ -15,13 +15,14 @@ FileSystem::~FileSystem(){
 
 void FileSystem::createFileSystem(int size, std::string name){
     // file allocation table size depends on predefined size of a File System
-    // roughly 10% of total storage is preserved for metadata node
+    // roughly 20% of total storage is preserved for metadata nodes
     // additional block for system info is at the beginning
     systemInfo.sizeKB = size;
     strcpy(systemInfo.name, name.c_str());
     systemInfo.totalBlocks = size * KILOBYTE / BLOCK_SIZE;
-    systemInfo.fatSize = round(systemInfo.totalBlocks / 10.0) + 1;
+    systemInfo.fatSize = ceil(systemInfo.totalBlocks / 10.0) * 2 + 1;
     systemInfo.usedBlocks = systemInfo.fatSize;
+    systemInfo.numberOfFiles = 0;
 
     fileFS.open(name.c_str(), std::ios::binary | std::ios::in | std::ios::out);
     if(!fileFS.is_open()){
@@ -43,7 +44,7 @@ void FileSystem::openFileSystem(std::string name){
 }
 
 void FileSystem::closeFileSystem(){
-    //writeSystemInfo();
+    writeSystemInfo();
     writeMetadata();
 }
 
@@ -53,6 +54,7 @@ void FileSystem::loadFile(std::string name){
         return;
     copyFileDataToFS(nodeID);
     sortMetadata();
+    systemInfo.numberOfFiles++;
 }
 
 void FileSystem::displaySystemInfo(){
@@ -77,22 +79,28 @@ void FileSystem::writeSystemInfo(){
 }
 
 void FileSystem::readMetadata(){
-    //TODO
-
+    int fileNumber = systemInfo.numberOfFiles;
+    for(int i = 0; i < fileNumber; i++){
+        FileNode node;
+        int nodeSize = sizeof(FileNode);
+        char nodeBuffer[nodeSize];
+        fileFS.seekp(BLOCK_SIZE + i * nodeSize);
+        fileFS.read(nodeBuffer, nodeSize);
+        memcpy(&node, nodeBuffer, nodeSize);
+        inodes.push_back(node);
+    }
 }
 
 void FileSystem::writeMetadata(){
-    //TODO
-    blockBuffer buf;
-    int bufferNumber;
-    if(inodes.empty())
-        return;
-    
-    memcpy(buf, &inodes, sizeof(inodes));
-    fileFS.seekp(BLOCK_SIZE);
-    cout << "struct: " << sizeof(FileNode) << " buffer: " << sizeof(buf) << " node vector: " << sizeof(inodes) << endl;
-    
-
+    int bufferNumber = 0;
+    for(FileNode node : inodes){
+        int nodeSize = sizeof(FileNode);
+        char nodeBuffer[nodeSize];
+        memcpy(nodeBuffer, &node, nodeSize);
+        fileFS.seekp(BLOCK_SIZE + bufferNumber * nodeSize);
+        fileFS.write(nodeBuffer, nodeSize);
+        bufferNumber++;
+    }
 }
 
 int FileSystem::getMemoryPosition(int blocksNumber){
@@ -100,21 +108,21 @@ int FileSystem::getMemoryPosition(int blocksNumber){
         return -1;
     }
     // empty or check if begining is available
-    else if(inodes.empty() || (inodes.size() > 0 && inodes.front().startBlock - systemInfo.fatSize >= blocksNumber)){
+    else if(inodes.empty() || (inodes.size() > 0 && inodes.front().startBlock - systemInfo.fatSize > blocksNumber)){
         return systemInfo.fatSize + 1;
     }
     // check place after the only inode
-    else if(inodes.size() == 1 && systemInfo.totalBlocks - getNodeEndBlock(inodes.front()) >= blocksNumber){
+    else if(inodes.size() == 1 && systemInfo.totalBlocks - getNodeEndBlock(inodes.front()) > blocksNumber){
         return getNodeEndBlock(inodes.front()) + 1;
     }
     else{
         // check places between blocks
         for(unsigned int i = 0; i < inodes.size() - 1; i++){
-            if(inodes[i + 1].startBlock - getNodeEndBlock(inodes[i]) >= blocksNumber)
+            if(inodes[i + 1].startBlock - getNodeEndBlock(inodes[i]) > blocksNumber)
                 return getNodeEndBlock(inodes[i]) + 1;
         }
         // check place in the end
-        if(systemInfo.totalBlocks - getNodeEndBlock(inodes.back()) >= blocksNumber)
+        if(systemInfo.totalBlocks - getNodeEndBlock(inodes.back()) > blocksNumber)
             return getNodeEndBlock(inodes.back()) + 1;
     }
     return 0;
@@ -132,6 +140,7 @@ int FileSystem::appendFileInfoToMetadata(std::string name){
     newNode.sizeInBytes = file_size(name);
     newNode.blocksNumber = ceil(newNode.sizeInBytes / (float)BLOCK_SIZE);
     newNode.startBlock = getMemoryPosition(newNode.blocksNumber);
+    systemInfo.usedBlocks += newNode.blocksNumber;
     if(newNode.startBlock == -1){
         cout << "Not enough memory to store the file" << endl;
         return -1;
@@ -149,10 +158,12 @@ int FileSystem::appendFileInfoToMetadata(std::string name){
 
 void FileSystem::copyFileDataToFS(int nodeID){
     //TODO
+    
 }
 
 void FileSystem::sortMetadata(){
-    sort(inodes.begin(), inodes.end(), FileSystem::compareNodes);
+    if(!inodes.empty())
+        sort(inodes.begin(), inodes.end(), FileSystem::compareNodes);
 }
 
 bool FileSystem::compareNodes(FileNode node1, FileNode node2){
@@ -171,5 +182,5 @@ void FileSystem::fillSysWithZeros(){
 }
 
 int FileSystem::getNodeEndBlock(FileNode node){
-    return node.startBlock + node.blocksNumber;
+    return node.startBlock + node.blocksNumber - 1;
 }
