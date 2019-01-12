@@ -49,6 +49,7 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "codecvt": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "strstream": "cpp"
     }
 }

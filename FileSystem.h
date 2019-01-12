@@ -57,10 +57,12 @@ class FileSystem{
         int defragmentMemory();
         int appendFileInfoToMetadata(std::string name);
         void copyFileDataToFS(int nodeID);
+        void writeFileToCurrentDir(int);
         void sortMetadata();
         static bool compareNodes(FileNode node1, FileNode node2);
         void fillSysWithZeros();
         int getNodeEndBlock(FileNode node);
+        bool doesFileExistInDIR(std::string);
 };
 
 

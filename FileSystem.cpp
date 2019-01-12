@@ -57,7 +57,35 @@ void FileSystem::loadFile(std::string name){
     systemInfo.numberOfFiles++;
 }
 
-void FileSystem::displaySystemInfo(){
+void FileSystem::downloadFile(std::string fileName){
+    for(int i = 0; i < inodes.size(); i++)
+        if(inodes[i].name == fileName)
+            writeFileToCurrentDir(i);
+    cout << "File " << fileName << " not found in the directory";
+}
+
+void FileSystem::displayCatalog(){
+    cout << "Files in a catalog: " << endl;
+    cout << "Name \t Size(bytes)" << endl;
+    if(inodes.empty())
+        cout << "[EMPTY]" << endl;
+    for(FileNode node : inodes)
+        cout << node.name << "\t" << node.sizeInBytes;
+}
+
+void FileSystem::deleteFile(std::string fileName){
+    for(int i = 0; i < inodes.size(); i++)
+        if(inodes[i].name == fileName)
+            inodes.erase(inodes.begin() + i);
+    cout << "File " << fileName << " not found in file system";
+
+}
+
+void FileSystem::displayMemoryMap(){
+    
+}
+
+void FileSystem::FileSystem::displaySystemInfo(){
     cout << "file System Type: " << systemInfo.fileSystemType << endl;
     cout << "name: " << systemInfo.name << endl;
     cout << "size in kB " << systemInfo.sizeKB << endl;
@@ -157,8 +185,38 @@ int FileSystem::appendFileInfoToMetadata(std::string name){
 }
 
 void FileSystem::copyFileDataToFS(int nodeID){
-    //TODO
     blockBuffer buf;
+    FileNode node = inodes[nodeID];
+    std::ifstream infile(node.name);
+    if(!infile.is_open()){
+        cout << "Error opening " << node.name << " file" << endl;
+        return;
+    }
+    for(int i = 0; i < node.blocksNumber; i++){
+        infile.read(buf, sizeof(buf));
+        fileFS.seekp((node.startBlock + i) * BLOCK_SIZE);
+        fileFS.write(buf, sizeof(buf));
+    }
+    infile.close();
+}
+
+void FileSystem::writeFileToCurrentDir(int nodeID){
+    blockBuffer buf;
+    FileNode node = inodes[nodeID];
+    if(doesFileExistInDIR(node.name)){
+        cout << "File " << node.name << " already exists in a directory ";
+        cout << "and will be raplaced" << endl;
+    }
+    std::ofstream outfile(node.name);
+    if(!outfile.is_open()){
+        cout << "Error opening " << node.name << " file" << endl;
+        return;
+    }
+    for(int i = 0; i < node.blocksNumber; i++){
+        fileFS.seekp((node.startBlock + i) * BLOCK_SIZE);
+        outfile.write(buf, sizeof(buf));
+    }
+    outfile.close();
     
 }
 
@@ -184,4 +242,9 @@ void FileSystem::fillSysWithZeros(){
 
 int FileSystem::getNodeEndBlock(FileNode node){
     return node.startBlock + node.blocksNumber - 1;
+}
+
+bool FileSystem::doesFileExistInDIR(std::string fileName){
+    std::ifstream file(fileName.c_str());
+    return file.good();
 }
