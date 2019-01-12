@@ -158,6 +158,7 @@ int FileSystem::appendFileInfoToMetadata(std::string name){
 
 void FileSystem::copyFileDataToFS(int nodeID){
     //TODO
+    blockBuffer buf;
     
 }
 
