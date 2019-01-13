@@ -1,4 +1,4 @@
-#include "FileSystem.h"
+#include "include/FileSystem.h"
 
 using std::cout;
 using std::endl;
@@ -24,7 +24,7 @@ void FileSystem::createFileSystem(int size, std::string name){
     systemInfo.usedBlocks = systemInfo.fatSize;
     systemInfo.numberOfFiles = 0;
 
-    fileFS.open(name.c_str(), std::ios::binary | std::ios::in | std::ios::out);
+    fileFS.open(name.c_str(), std::ios::binary | std::ios::out);
     if(!fileFS.is_open()){
         cout << "Error opening FS file" << endl;
         return;
@@ -49,6 +49,10 @@ void FileSystem::closeFileSystem(){
 }
 
 void FileSystem::loadFile(std::string name){
+    if(doesFileExistInFS(name)){
+        cout << "File already exists in file system and will not be loaded" << endl;
+        return;
+    }
     int nodeID = appendFileInfoToMetadata(name);
     if(nodeID < 0)
         return;
@@ -58,10 +62,12 @@ void FileSystem::loadFile(std::string name){
 }
 
 void FileSystem::downloadFile(std::string fileName){
-    for(int i = 0; i < inodes.size(); i++)
-        if(inodes[i].name == fileName)
+    for(unsigned i = 0; i < inodes.size(); i++)
+        if(inodes[i].name == fileName){
             writeFileToCurrentDir(i);
-    cout << "File " << fileName << " not found in the directory";
+            return;
+        }
+    cout << "File " << fileName << " not found in the directory" << endl;
 }
 
 void FileSystem::displayCatalog(){
@@ -70,19 +76,42 @@ void FileSystem::displayCatalog(){
     if(inodes.empty())
         cout << "[EMPTY]" << endl;
     for(FileNode node : inodes)
-        cout << node.name << "\t" << node.sizeInBytes;
+        cout << node.name << "\t" << node.sizeInBytes << endl;
 }
 
 void FileSystem::deleteFile(std::string fileName){
-    for(int i = 0; i < inodes.size(); i++)
-        if(inodes[i].name == fileName)
+    for(unsigned i = 0; i < inodes.size(); i++)
+        if(inodes[i].name == fileName){
             inodes.erase(inodes.begin() + i);
-    cout << "File " << fileName << " not found in file system";
-
+            return;
+        }
+    cout << "File " << fileName << " not found in file system" << endl;
 }
 
 void FileSystem::displayMemoryMap(){
-    
+    cout << std::setw(10) << "address" << std::setw(20) << "type";
+    cout << std::setw(10) << "size" << std::setw(10) << "state" << endl;
+
+    cout << std::setw(10) << 1 << std::setw(20) << "SYS Info";
+    cout << std::setw(10) << BLOCK_SIZE << std::setw(10) << "used" << endl;
+
+    for(int i = 2; i < systemInfo.fatSize + 1; i++){
+        cout << std::setw(10) << i << std::setw(20) << "File metadata";
+        cout << std::setw(10) << BLOCK_SIZE << std::setw(10) << "used" << endl;
+    }
+    for(int i = systemInfo.fatSize + 1; i < systemInfo.totalBlocks + 1; i++){
+        std::string message1, message2, filename;
+        if(isBlockUsed(i)){
+            message1 = getFileNameFromMemID(i);
+            message2 = "used";
+        }
+        else{
+            message1 = "File data";
+            message2 = "empty";
+        }
+        cout << std::setw(10) << i << std::setw(20) << message1;
+        cout << std::setw(10) << BLOCK_SIZE << std::setw(10) << message2 << endl;
+    }
 }
 
 void FileSystem::FileSystem::displaySystemInfo(){
@@ -205,7 +234,7 @@ void FileSystem::writeFileToCurrentDir(int nodeID){
     FileNode node = inodes[nodeID];
     if(doesFileExistInDIR(node.name)){
         cout << "File " << node.name << " already exists in a directory ";
-        cout << "and will be raplaced" << endl;
+        cout << "and will be replaced" << endl;
     }
     std::ofstream outfile(node.name);
     if(!outfile.is_open()){
@@ -214,7 +243,12 @@ void FileSystem::writeFileToCurrentDir(int nodeID){
     }
     for(int i = 0; i < node.blocksNumber; i++){
         fileFS.seekp((node.startBlock + i) * BLOCK_SIZE);
-        outfile.write(buf, sizeof(buf));
+        int size = sizeof(buf);
+        if(i == node.blocksNumber - 1){
+            size = node.sizeInBytes - i * sizeof(buf);
+        }
+        fileFS.read(buf, size);
+        outfile.write(buf, size);
     }
     outfile.close();
     
@@ -247,4 +281,28 @@ int FileSystem::getNodeEndBlock(FileNode node){
 bool FileSystem::doesFileExistInDIR(std::string fileName){
     std::ifstream file(fileName.c_str());
     return file.good();
+}
+
+bool FileSystem::doesFileExistInFS(std::string fileName){
+    for(auto node : inodes){
+        if(node.name == fileName)
+            return true;
+    }
+    return false;
+}
+
+bool FileSystem::isBlockUsed(int memID){
+    for(auto node : inodes){
+        if(memID >= node.startBlock && memID <= getNodeEndBlock(node))
+            return true;
+    }
+    return false;
+}
+
+std::string FileSystem::getFileNameFromMemID(int memID){
+    for(auto node : inodes){
+        if(memID >= node.startBlock && memID <= getNodeEndBlock(node))
+            return node.name;
+    }
+    return "none";
 }

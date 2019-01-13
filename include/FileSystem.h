@@ -63,7 +63,9 @@ class FileSystem{
         void fillSysWithZeros();
         int getNodeEndBlock(FileNode node);
         bool doesFileExistInDIR(std::string);
+        bool doesFileExistInFS(std::string);
+        bool isBlockUsed(int memID);
+        std::string getFileNameFromMemID(int memID);
 };
-
 
 #endif
