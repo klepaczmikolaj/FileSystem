@@ -185,12 +185,6 @@ int FileSystem::getMemoryPosition(int blocksNumber){
     return 0;
 }
 
-int FileSystem::defragmentMemory(){
-    // last to do
-
-    return -1;
-}
-
 int FileSystem::appendFileInfoToMetadata(std::string name){
     FileNode newNode;
     strcpy(newNode.name, name.c_str());
@@ -203,14 +197,34 @@ int FileSystem::appendFileInfoToMetadata(std::string name){
         return -1;
     }
     else if(newNode.startBlock == 0){
-        if(defragmentMemory() == -1){
-            cout << "Defragmentation failed, unable to load file due to memory fragmentation" << endl;
-            return -1;
-        }
+        //if(defragmentMemory() == -1){
+        //    cout << "Defragmentation failed, unable to load file due to memory fragmentation" << endl;
+        //    return -1;
+        //}
+        defragmentMemory();
         newNode.startBlock = getMemoryPosition(newNode.blocksNumber);
     }
     inodes.push_back(newNode);
     return inodes.size() - 1;
+}
+
+int FileSystem::defragmentMemory(){
+    blockBuffer buf;
+    int nextBlock = systemInfo.fatSize + 1;
+    int i = 0;
+    for(FileNode node : inodes){
+        fileFS.seekp(BLOCK_SIZE * node.startBlock);
+        fileFS.read(buf, sizeof(buf));
+
+        fileFS.seekp(BLOCK_SIZE * nextBlock);
+        fileFS.write(buf, sizeof(buf));
+        
+        node.startBlock = nextBlock;
+        nextBlock = getNodeEndBlock(node) + 1;
+        i++;
+    }
+    return 0;
+    //return -1;
 }
 
 void FileSystem::copyFileDataToFS(int nodeID){
